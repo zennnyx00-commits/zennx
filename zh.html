@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translator Natural ID-ZH</title>
+    <style>
+        /* Desain Minimalis & Responsif */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f7f7f7;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            padding: 1rem; /* Padding dikurangi untuk mobile */
+        }
+        .container {
+            background-color: #fff;
+            width: 100%;
+            max-width: 600px;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        .api-input {
+            margin-bottom: 1rem;
+        }
+        .api-input input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+        .api-input input:focus {
+            border-color: #1a1a1a;
+        }
+        /* PERBAIKAN UI: Layout Kontrol untuk Mobile & Desktop */
+        .controls {
+            display: flex;
+            flex-direction: column; /* Default numpuk atas-bawah untuk HP */
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+        select, button {
+            width: 100%;
+            padding: 0.8rem;
+            font-size: 0.9rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+        }
+        button {
+            background-color: #1a1a1a;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #333; }
+        button:disabled { background-color: #999; cursor: not-allowed; }
+        
+        /* Jika layar cukup lebar (Tablet/Desktop), kembalikan posisi sejajar */
+        @media (min-width: 480px) {
+            .controls {
+                flex-direction: row;
+            }
+            select { flex: 1; }
+            button { width: auto; padding: 0.8rem 1.5rem; }
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            resize: vertical;
+            margin-bottom: 1rem;
+            font-family: inherit;
+            outline: none;
+            line-height: 1.5;
+        }
+        textarea:focus { border-color: #1a1a1a; }
+        .output-box { background-color: #fafafa; border-color: #eaeaea; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Translator Natural</h2>
+        
+        <div class="api-input">
+            <input type="password" id="apiKey" placeholder="Masukkan API Key Grok di sini..." />
+        </div>
+
+        <div class="controls">
+            <select id="direction">
+                <option value="id-zh">🇮🇩 Indonesia ➔ 🇨🇳 Mandarin</option>
+                <option value="zh-id">🇨🇳 Mandarin ➔ 🇮🇩 Indonesia</option>
+            </select>
+            <button id="translateBtn" onclick="translateText()">Terjemahkan</button>
+        </div>
+
+        <textarea id="inputText" placeholder="Ketik teks di sini..."></textarea>
+        <textarea id="outputText" class="output-box" placeholder="Hasil terjemahan akan muncul di sini..." readonly></textarea>
+    </div>
+
+    <script>
+        async function translateText() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const inputText = document.getElementById('inputText').value.trim();
+            const direction = document.getElementById('direction').value;
+            const translateBtn = document.getElementById('translateBtn');
+            const outputText = document.getElementById('outputText');
+
+            if (!apiKey) {
+                alert("Harap masukkan API Key Grok terlebih dahulu!");
+                return;
+            }
+            if (!inputText) return;
+
+            const isIdToZh = direction === 'id-zh';
+            const sourceLang = isIdToZh ? "Indonesia" : "Mandarin";
+            const targetLang = isIdToZh ? "Mandarin" : "Indonesia";
+
+            const systemPrompt = `Anda adalah penerjemah ahli bahasa ${sourceLang} dan ${targetLang}. 
+Tugas Anda: Terjemahkan teks yang diberikan ke bahasa ${targetLang}.
+ATURAN WAJIB:
+1. Hasil terjemahan HARUS SANGAT NATURAL, luwes, dan sesuai dengan percakapan manusia sehari-hari.
+2. Jika ada idiom atau slang, terjemahkan ke padanan yang paling pas secara makna.
+3. HANYA berikan teks hasil terjemahan akhirnya saja.
+4. DILARANG KERAS memberikan penjelasan, pinyin, atau kalimat basa-basi. Langsung tulis terjemahannya.`;
+
+            translateBtn.disabled = true;
+            translateBtn.innerText = "Proses...";
+            outputText.value = "";
+
+            try {
+                // PERBAIKAN CORS: Menambahkan proxy 'corsproxy.io' di depan URL API
+                // Catatan: Ini aman untuk testing, tapi hindari memasukkan data sensitif ya.
+                const targetUrl = 'https://api.xai.com/v1/chat/completions';
+                const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+
+                const response = await fetch(proxyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: "grok-beta",
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: inputText }
+                        ],
+                        temperature: 0.4
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const result = data.choices[0].message.content.trim();
+                
+                outputText.value = result;
+
+            } catch (error) {
+                console.error(error);
+                outputText.value = "Gagal memuat API. Pastikan API Key valid atau coba lagi nanti. Cek console browser untuk detail error.";
+            } finally {
+                translateBtn.disabled = false;
+                translateBtn.innerText = "Terjemahkan";
+            }
+        }
+    </script>
+</body>
+</html>
